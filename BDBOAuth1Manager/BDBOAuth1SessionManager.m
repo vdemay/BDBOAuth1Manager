@@ -49,6 +49,20 @@
     return self;
 }
 
+- (instancetype)initWithBaseURL:(NSURL *)baseURL
+           sessionConfiguration:(NSURLSessionConfiguration *)configuration
+                    consumerKey:(NSString *)consumerKey
+                 consumerSecret:(NSString *)consumerSecret {
+    self = [super initWithBaseURL:baseURL sessionConfiguration:configuration];
+    
+    if (self) {
+        self.requestSerializer  = [BDBOAuth1RequestSerializer serializerForService:baseURL.host
+                                                                   withConsumerKey:consumerKey
+                                                                    consumerSecret:consumerSecret];
+    }
+    
+    return self;
+}
 #pragma mark Authorization Status
 - (BOOL)isAuthorized {
     return (self.requestSerializer.accessToken && !self.requestSerializer.accessToken.expired);
