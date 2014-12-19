@@ -56,6 +56,22 @@
 
 
 /**
+ *  Initialize a new BDBOAuth1SessionManager instance with the given baseURL, consumerKey, and consumerSecret.
+ *
+ *  @param baseURL              Base URL for HTTP requests.
+ *  @param sessionConfiguration SessionConfiguration.
+ *  @param consumerKey          OAuth consumer key.
+ *  @param consumerSecret       OAuth consumer secret.
+ *
+ *  @return New BDBOAuth1SessionManager instance.
+ */
+- (instancetype)initWithBaseURL:(NSURL *)baseURL
+           sessionConfiguration:(NSURLSessionConfiguration *)configuration
+                    consumerKey:(NSString *)consumerKey
+                 consumerSecret:(NSString *)consumerSecret;
+
+
+/**
  *  ---------------------------------------------------------------------------------------
  * @name Authorization Status
  *  ---------------------------------------------------------------------------------------
