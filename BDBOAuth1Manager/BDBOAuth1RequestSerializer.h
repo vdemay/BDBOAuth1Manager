@@ -141,28 +141,32 @@ FOUNDATION_EXPORT NSString * const BDBOAuth1OAuthCallbackParameter;
 /**
  *  Create a new BDBOAuth1RequestSerializer instance for the given service with its consumerKey and consumerSecret.
  *
- *  @param service        Service (base URL) this request serializer is used for.
- *  @param consumerKey    OAuth consumer key.
- *  @param consumerSecret OAuth consumer secret.
+ *  @param service              Service (base URL) this request serializer is used for.
+ *  @param consumerKey          OAuth consumer key.
+ *  @param consumerSecret       OAuth consumer secret.
+ *  @param shareDefaultGroupId  shareGroupId to share sotorage
  *
  *  @return New BDBOAuth1RequestSerializer for the specified service.
  */
 + (instancetype)serializerForService:(NSString *)service
                      withConsumerKey:(NSString *)consumerKey
-                      consumerSecret:(NSString *)consumerSecret;
+                      consumerSecret:(NSString *)consumerSecret
+                 shareDefaultGroupId:(NSString *)shareDefaultGroupId;
 
 /**
  *  Instantiate a new BDBOAuth1RequestSerializer instance for the given service with its consumerKey and consumerSecret.
  *
- *  @param service        Service (base URL) this request serializer is used for.
- *  @param consumerKey    OAuth consumer key.
- *  @param consumerSecret OAuth consumer secret.
+ *  @param service              Service (base URL) this request serializer is used for.
+ *  @param consumerKey          OAuth consumer key.
+ *  @param consumerSecret       OAuth consumer secret.
+ *  @param shareDefaultGroupId  shareGroupId to share sotorage
  *
  *  @return New BDBOAuth1RequestSerializer for the specified service.
  */
 - (instancetype)initWithService:(NSString *)service
                     consumerKey:(NSString *)consumerKey
-                 consumerSecret:(NSString *)consumerSecret;
+                 consumerSecret:(NSString *)consumerSecret
+            shareDefaultGroupId:(NSString *)shareDefaultGroupId;
 
 
 /**
@@ -176,10 +180,11 @@ FOUNDATION_EXPORT NSString * const BDBOAuth1OAuthCallbackParameter;
  *  Save the given OAuth access token in the user's keychain for future use with this serializer's service.
  *
  *  @param accessToken OAuth access token.
+ *  @param shareDefaultGroupId  shareGroupId to share sotorage
  *
  *  @return Success of keychain item add/update operation.
  */
-- (BOOL)saveAccessToken:(BDBOAuth1Credential *)accessToken;
+- (BOOL)saveAccessToken:(BDBOAuth1Credential *)accessToken withShareDefaultGroupId:(NSString*) shareDefaultGroupId;
 
 /**
  *  Remove the access token currently stored in the keychain for this serializer's service.

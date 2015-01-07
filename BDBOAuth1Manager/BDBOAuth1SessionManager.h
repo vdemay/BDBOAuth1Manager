@@ -52,7 +52,8 @@
  */
 - (instancetype)initWithBaseURL:(NSURL *)baseURL
                     consumerKey:(NSString *)consumerKey
-                 consumerSecret:(NSString *)consumerSecret;
+                 consumerSecret:(NSString *)consumerSecret
+            shareDefaultGroupId:(NSString *)shareDefaultGroupId;
 
 
 /**
@@ -68,7 +69,8 @@
 - (instancetype)initWithBaseURL:(NSURL *)baseURL
            sessionConfiguration:(NSURLSessionConfiguration *)configuration
                     consumerKey:(NSString *)consumerKey
-                 consumerSecret:(NSString *)consumerSecret;
+                 consumerSecret:(NSString *)consumerSecret
+            shareDefaultGroupId:(NSString *)shareDefaultGroupId;
 
 
 /**

@@ -23,7 +23,6 @@
 #import "BDBFlickrClient.h"
 #import "BDBFlickrPhoto.h"
 #import "BDBFlickrPhotoset.h"
-#import "BDBOAuth1RequestOperationManager.h"
 #import "BDBOAuth1SessionManager.h"
 
 #import "NSDictionary+BDBOAuth1Manager.h"
@@ -90,12 +89,7 @@ static BDBFlickrClient *_sharedClient = nil;
         _apiKey = [apiKey copy];
 
         NSURL *baseURL = [NSURL URLWithString:kBDBFlickrClientAPIURL];
-
-#if USE_NSURLSESSION
-        _networkManager = [[BDBOAuth1SessionManager alloc] initWithBaseURL:baseURL consumerKey:apiKey consumerSecret:secret];
-#else
-        _networkManager = [[BDBOAuth1RequestOperationManager alloc] initWithBaseURL:baseURL consumerKey:apiKey consumerSecret:secret];
-#endif
+        _networkManager = [[BDBOAuth1SessionManager alloc] initWithBaseURL:baseURL consumerKey:apiKey consumerSecret:secret shareDefaultGroupId:nil];
     }
 
     return self;
@@ -194,19 +188,12 @@ static BDBFlickrClient *_sharedClient = nil;
 
     static NSString *path = @"rest";
 
-#if USE_NSURLSESSION
     [self.networkManager GET:path parameters:params success:^(NSURLSessionDataTask *task, id responseObject) {
         [self parsePhotosetsFromAPIResponseObject:responseObject completion:completion];
     } failure:^(NSURLSessionDataTask *task, NSError *error) {
         completion(nil, error);
     }];
-#else
-    [self.networkManager GET:path parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
-        [self parsePhotosetsFromAPIResponseObject:responseObject completion:completion];
-    } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
-        completion(nil, error);
-    }];
-#endif
+
 }
 
 - (void)parsePhotosetsFromAPIResponseObject:(id)responseObject completion:(void (^)(NSSet *, NSError *))completion {
@@ -250,19 +237,11 @@ static BDBFlickrClient *_sharedClient = nil;
 
     static NSString *path = @"rest";
 
-#if USE_NSURLSESSION
     [self.networkManager GET:path parameters:params success:^(NSURLSessionDataTask *task, id responseObject) {
         [self parsePhotosFromAPIResponseObject:responseObject completion:completion];
     } failure:^(NSURLSessionDataTask *task, NSError *error) {
         completion(nil, error);
     }];
-#else
-    [self.networkManager GET:path parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
-        [self parsePhotosFromAPIResponseObject:responseObject completion:completion];
-    } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
-        completion(nil, error);
-    }];
-#endif
 }
 
 - (void)parsePhotosFromAPIResponseObject:(id)responseObject completion:(void (^)(NSArray *, NSError *))completion {

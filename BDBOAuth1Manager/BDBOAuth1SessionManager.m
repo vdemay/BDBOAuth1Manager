@@ -28,6 +28,8 @@
 #pragma mark -
 @interface BDBOAuth1SessionManager ()
 
+@property (nonatomic, strong) NSString* shareDefaultGroupId;
+
 @end
 
 
@@ -37,28 +39,35 @@
 #pragma mark Initialization
 - (instancetype)initWithBaseURL:(NSURL *)baseURL
                     consumerKey:(NSString *)consumerKey
-                 consumerSecret:(NSString *)consumerSecret {
+                 consumerSecret:(NSString *)consumerSecret
+            shareDefaultGroupId:(NSString *)shareDefaultGroupId{
     self = [super initWithBaseURL:baseURL];
-
+    
     if (self) {
         self.requestSerializer  = [BDBOAuth1RequestSerializer serializerForService:baseURL.host
                                                                    withConsumerKey:consumerKey
-                                                                    consumerSecret:consumerSecret];
+                                                                    consumerSecret:consumerSecret
+                                                               shareDefaultGroupId:shareDefaultGroupId];
+        self.shareDefaultGroupId = shareDefaultGroupId;
     }
-
+    
     return self;
 }
 
 - (instancetype)initWithBaseURL:(NSURL *)baseURL
            sessionConfiguration:(NSURLSessionConfiguration *)configuration
                     consumerKey:(NSString *)consumerKey
-                 consumerSecret:(NSString *)consumerSecret {
+                 consumerSecret:(NSString *)consumerSecret
+            shareDefaultGroupId:(NSString *)shareDefaultGroupId {
     self = [super initWithBaseURL:baseURL sessionConfiguration:configuration];
     
     if (self) {
         self.requestSerializer  = [BDBOAuth1RequestSerializer serializerForService:baseURL.host
                                                                    withConsumerKey:consumerKey
-                                                                    consumerSecret:consumerSecret];
+                                                                    consumerSecret:consumerSecret
+                                                               shareDefaultGroupId:shareDefaultGroupId];
+        
+        self.shareDefaultGroupId = shareDefaultGroupId;
     }
     
     return self;
@@ -80,42 +89,42 @@
                           success:(void (^)(BDBOAuth1Credential *requestToken))success
                           failure:(void (^)(NSError *error))failure {
     self.requestSerializer.requestToken = nil;
-
+    
     AFHTTPResponseSerializer *defaultSerializer = self.responseSerializer;
     self.responseSerializer = [AFHTTPResponseSerializer serializer];
-
+    
     NSMutableDictionary *parameters = [[self.requestSerializer OAuthParameters] mutableCopy];
     parameters[BDBOAuth1OAuthCallbackParameter] = [callbackURL absoluteString];
-
+    
     if (scope && !self.requestSerializer.accessToken) {
         parameters[@"scope"] = scope;
     }
-
+    
     NSString *URLString = [[NSURL URLWithString:requestPath relativeToURL:self.baseURL] absoluteString];
     NSError *error;
     NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:method URLString:URLString parameters:parameters error:&error];
-
+    
     if (error) {
         failure(error);
-
+        
         return;
     }
-
+    
     void (^completionBlock)(NSURLResponse * __unused, id, NSError *) = ^(NSURLResponse * __unused response, id responseObject, NSError *error) {
         self.responseSerializer = defaultSerializer;
-
+        
         if (error) {
             failure(error);
-
+            
             return;
         }
-
+        
         BDBOAuth1Credential *requestToken = [BDBOAuth1Credential credentialWithQueryString:[[NSString alloc] initWithData:responseObject encoding:NSUTF8StringEncoding]];
         self.requestSerializer.requestToken = requestToken;
-
+        
         success(requestToken);
     };
-
+    
     NSURLSessionDataTask *task = [self dataTaskWithRequest:request completionHandler:completionBlock];
     [task resume];
 }
@@ -129,45 +138,45 @@
         NSError *error = [[NSError alloc] initWithDomain:BDBOAuth1ErrorDomain
                                                     code:NSURLErrorBadServerResponse
                                                 userInfo:@{NSLocalizedFailureReasonErrorKey:@"Invalid OAuth response received from server."}];
-
+        
         failure(error);
-
+        
         return;
     }
-
+    
     AFHTTPResponseSerializer *defaultSerializer = self.responseSerializer;
     self.responseSerializer = [AFHTTPResponseSerializer serializer];
-
+    
     NSMutableDictionary *parameters = [[self.requestSerializer OAuthParameters] mutableCopy];
     parameters[BDBOAuth1OAuthTokenParameter]    = requestToken.token;
     parameters[BDBOAuth1OAuthVerifierParameter] = requestToken.verifier;
-
+    
     NSString *URLString = [[NSURL URLWithString:accessPath relativeToURL:self.baseURL] absoluteString];
     NSError *error;
     NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:method URLString:URLString parameters:parameters error:&error];
-
+    
     if (error) {
         failure(error);
-
+        
         return;
     }
-
+    
     void (^completionBlock)(NSURLResponse * __unused, id, NSError *) = ^(NSURLResponse * __unused response, id responseObject, NSError *error) {
         self.responseSerializer = defaultSerializer;
         self.requestSerializer.requestToken = nil;
-
+        
         if (error) {
             failure(error);
-
+            
             return;
         }
-
+        
         BDBOAuth1Credential *accessToken = [BDBOAuth1Credential credentialWithQueryString:[[NSString alloc] initWithData:responseObject encoding:NSUTF8StringEncoding]];
-        [self.requestSerializer saveAccessToken:accessToken];
-
+        [self.requestSerializer saveAccessToken:accessToken withShareDefaultGroupId:self.shareDefaultGroupId];
+        
         success(accessToken);
     };
-
+    
     NSURLSessionDataTask *task = [self dataTaskWithRequest:request completionHandler:completionBlock];
     [task resume];
 }

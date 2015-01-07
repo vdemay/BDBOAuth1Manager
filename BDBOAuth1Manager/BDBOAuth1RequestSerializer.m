@@ -62,8 +62,8 @@ NSString * const BDBOAuth1SignatureNonceParameter       = @"oauth_nonce";
 
 #pragma mark Initialization
 + (instancetype)credentialWithToken:(NSString *)token
-                        secret:(NSString *)secret
-                    expiration:(NSDate *)expiration {
+                             secret:(NSString *)secret
+                         expiration:(NSDate *)expiration {
     return [[[self class] alloc] initWithToken:token
                                         secret:secret
                                     expiration:expiration];
@@ -73,15 +73,15 @@ NSString * const BDBOAuth1SignatureNonceParameter       = @"oauth_nonce";
                        secret:(NSString *)secret
                    expiration:(NSDate *)expiration {
     NSParameterAssert(token);
-
+    
     self = [super init];
-
+    
     if (self) {
         _token = token;
         _secret = secret;
         _expiration = expiration;
     }
-
+    
     return self;
 }
 
@@ -91,33 +91,33 @@ NSString * const BDBOAuth1SignatureNonceParameter       = @"oauth_nonce";
 
 - (instancetype)initWithQueryString:(NSString *)queryString {
     NSDictionary *attributes = [NSDictionary bdb_dictionaryFromQueryString:queryString];
-
+    
     NSString *token    = attributes[BDBOAuth1OAuthTokenParameter];
     NSString *secret   = attributes[BDBOAuth1OAuthTokenSecretParameter];
     NSString *verifier = attributes[BDBOAuth1OAuthVerifierParameter];
-
+    
     NSDate *expiration = nil;
-
+    
     if (attributes[BDBOAuth1OAuthTokenDurationParameter]) {
         expiration = [NSDate dateWithTimeIntervalSinceNow:[attributes[BDBOAuth1OAuthTokenDurationParameter] doubleValue]];
     }
-
+    
     self = [self initWithToken:token secret:secret expiration:expiration];
-
+    
     if (self) {
         _verifier = verifier;
-
+        
         NSMutableDictionary *mutableUserInfo = [attributes mutableCopy];
         [mutableUserInfo removeObjectsForKeys:@[BDBOAuth1OAuthTokenParameter,
                                                 BDBOAuth1OAuthTokenSecretParameter,
                                                 BDBOAuth1OAuthVerifierParameter,
                                                 BDBOAuth1OAuthTokenDurationParameter]];
-
+        
         if (mutableUserInfo.count > 0) {
             _userInfo = [NSDictionary dictionaryWithDictionary:mutableUserInfo];
         }
     }
-
+    
     return self;
 }
 
@@ -133,7 +133,7 @@ NSString * const BDBOAuth1SignatureNonceParameter       = @"oauth_nonce";
 #pragma mark NSCoding
 - (id)initWithCoder:(NSCoder *)decoder {
     self = [super init];
-
+    
     if (self) {
         _token      = [decoder decodeObjectForKey:NSStringFromSelector(@selector(token))];
         _secret     = [decoder decodeObjectForKey:NSStringFromSelector(@selector(secret))];
@@ -141,7 +141,7 @@ NSString * const BDBOAuth1SignatureNonceParameter       = @"oauth_nonce";
         _expiration = [decoder decodeObjectForKey:NSStringFromSelector(@selector(expiration))];
         _userInfo   = [decoder decodeObjectForKey:NSStringFromSelector(@selector(userInfo))];
     }
-
+    
     return self;
 }
 
@@ -160,7 +160,7 @@ NSString * const BDBOAuth1SignatureNonceParameter       = @"oauth_nonce";
                                                                       expiration:self.expiration];
     copy.verifier = self.verifier;
     copy.userInfo = self.userInfo;
-
+    
     return copy;
 }
 
@@ -192,25 +192,28 @@ NSString * const BDBOAuth1SignatureNonceParameter       = @"oauth_nonce";
 #pragma mark Initialization
 + (instancetype)serializerForService:(NSString *)service
                      withConsumerKey:(NSString *)consumerKey
-                      consumerSecret:(NSString *)consumerSecret {
+                      consumerSecret:(NSString *)consumerSecret
+                 shareDefaultGroupId:(NSString *)shareDefaultGroupId{
     return [[[self class] alloc] initWithService:service
                                      consumerKey:consumerKey
-                                  consumerSecret:consumerSecret];
+                                  consumerSecret:consumerSecret
+                             shareDefaultGroupId:shareDefaultGroupId];
 }
 
 - (instancetype)initWithService:(NSString *)service
                     consumerKey:(NSString *)consumerKey
-                 consumerSecret:(NSString *)consumerSecret {
+                 consumerSecret:(NSString *)consumerSecret
+            shareDefaultGroupId:(NSString *)shareDefaultGroupId {
     self = [super init];
-
+    
     if (self) {
         _service = service;
         _consumerKey = consumerKey;
         _consumerSecret = consumerSecret;
-
-        _accessToken = [self readAccessTokenFromKeychain];
+        
+        _accessToken = [self readAccessTokenFromKeychain:shareDefaultGroupId];
     }
-
+    
     return self;
 }
 
@@ -220,64 +223,99 @@ static NSDictionary *OAuthKeychainDictionaryForService(NSString *service) {
              (__bridge id)kSecAttrService:service};
 }
 
-- (BDBOAuth1Credential *)readAccessTokenFromKeychain {
-    NSMutableDictionary *dictionary = [OAuthKeychainDictionaryForService(self.service) mutableCopy];
-    dictionary[(__bridge id)kSecReturnData] = (__bridge id)kCFBooleanTrue;
-    dictionary[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
-
-    CFDataRef result = nil;
-    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)dictionary, (CFTypeRef *)&result);
-    NSData *data = (__bridge_transfer NSData *)result;
-
-    if (status == noErr && data) {
-        @try {
-            NSKeyedUnarchiver *unarchiver = [[NSKeyedUnarchiver alloc] initForReadingWithData:data];
-            [unarchiver setClass:[BDBOAuth1Credential class] forClassName:@"BDBOAuthToken"];
-
-            return [unarchiver decodeObjectForKey:NSKeyedArchiveRootObjectKey];
-        }
-        @catch (NSException *exception) {
-            return nil;
-        }
+- (BDBOAuth1Credential *)readAccessTokenFromKeychain:(NSString*) shareDefaultGroupId {
+    
+    NSUserDefaults *sharedDefaults = nil;
+    if (shareDefaultGroupId == nil) {
+        sharedDefaults = [NSUserDefaults standardUserDefaults];
+    } else {
+        sharedDefaults = [[NSUserDefaults alloc] initWithSuiteName:shareDefaultGroupId];
     }
-
-    return nil;
+    
+    NSData *encodedObject = [sharedDefaults objectForKey:@"accessToken"];
+    
+    BDBOAuth1Credential *cred = [NSKeyedUnarchiver unarchiveObjectWithData:encodedObject];
+    
+    return cred;
+    
+    /*NSMutableDictionary *dictionary = [OAuthKeychainDictionaryForService(self.service) mutableCopy];
+     dictionary[(__bridge id)kSecReturnData] = (__bridge id)kCFBooleanTrue;
+     dictionary[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
+     
+     CFDataRef result = nil;
+     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)dictionary, (CFTypeRef *)&result);
+     NSData *data = (__bridge_transfer NSData *)result;
+     
+     if (status == noErr && data) {
+     @try {
+     NSKeyedUnarchiver *unarchiver = [[NSKeyedUnarchiver alloc] initForReadingWithData:data];
+     [unarchiver setClass:[BDBOAuth1Credential class] forClassName:@"BDBOAuthToken"];
+     
+     return [unarchiver decodeObjectForKey:NSKeyedArchiveRootObjectKey];
+     }
+     @catch (NSException *exception) {
+     return nil;
+     }
+     }
+     
+     return nil;
+     */
 }
 
-- (BOOL)saveAccessToken:(BDBOAuth1Credential *)accessToken {
-    NSMutableDictionary *dictionary = [OAuthKeychainDictionaryForService(self.service) mutableCopy];
-
-    NSMutableDictionary *updateDictionary = [NSMutableDictionary dictionary];
-    NSData *data = [NSKeyedArchiver archivedDataWithRootObject:accessToken];
-    updateDictionary[(__bridge id)kSecValueData] = data;
-
-    OSStatus status;
-
-    if (self.accessToken) {
-        status = SecItemUpdate((__bridge CFDictionaryRef)dictionary, (__bridge CFDictionaryRef)updateDictionary);
+- (BOOL)saveAccessToken:(BDBOAuth1Credential *)accessToken withShareDefaultGroupId:(NSString*) shareDefaultGroupId {
+    
+    NSUserDefaults *sharedDefaults = nil;
+    if (shareDefaultGroupId == nil) {
+        sharedDefaults = [NSUserDefaults standardUserDefaults];
     } else {
-        [dictionary addEntriesFromDictionary:updateDictionary];
-        status = SecItemAdd((__bridge CFDictionaryRef)dictionary, NULL);
+        sharedDefaults = [[NSUserDefaults alloc] initWithSuiteName:shareDefaultGroupId];
     }
-
+    
+    NSData *encodedObject = [NSKeyedArchiver archivedDataWithRootObject:accessToken];
+    
+    [sharedDefaults setValue:encodedObject forKey:@"accessToken"];
+    
+    [sharedDefaults synchronize];
+    
     _accessToken = accessToken;
-
-    if (status == noErr) {
-        return YES;
-    }
-
-    return NO;
+    return YES;
+    
+    
+    /*
+     NSMutableDictionary *dictionary = [OAuthKeychainDictionaryForService(self.service) mutableCopy];
+     
+     NSMutableDictionary *updateDictionary = [NSMutableDictionary dictionary];
+     NSData *data = [NSKeyedArchiver archivedDataWithRootObject:accessToken];
+     updateDictionary[(__bridge id)kSecValueData] = data;
+     
+     OSStatus status;
+     
+     if (self.accessToken) {
+     status = SecItemUpdate((__bridge CFDictionaryRef)dictionary, (__bridge CFDictionaryRef)updateDictionary);
+     } else {
+     [dictionary addEntriesFromDictionary:updateDictionary];
+     status = SecItemAdd((__bridge CFDictionaryRef)dictionary, NULL);
+     }
+     
+     _accessToken = accessToken;
+     
+     if (status == noErr) {
+     return YES;
+     }
+     
+     return NO;
+     */
 }
 
 - (BOOL)removeAccessToken {
     OSStatus status = SecItemDelete((__bridge CFDictionaryRef)OAuthKeychainDictionaryForService(self.service));
-
+    
     _accessToken = nil;
-
+    
     if (status == noErr) {
         return YES;
     }
-
+    
     return NO;
 }
 
@@ -288,7 +326,7 @@ static NSDictionary *OAuthKeychainDictionaryForService(NSString *service) {
     parameters[BDBOAuth1SignatureConsumerKeyParameter] = self.consumerKey;
     parameters[BDBOAuth1SignatureTimestampParameter]   = [@(floor([[NSDate date] timeIntervalSince1970])) stringValue];
     parameters[BDBOAuth1SignatureMethodParameter]      = @"HMAC-SHA1";
-
+    
     CFUUIDRef uuid = CFUUIDCreate(kCFAllocatorDefault);
     CFUUIDBytes uuidBytes = CFUUIDGetUUIDBytes(uuid);
     CFRelease(uuid);
@@ -298,7 +336,7 @@ static NSDictionary *OAuthKeychainDictionaryForService(NSString *service) {
 #else
     parameters[BDBOAuth1SignatureNonceParameter] = [[NSData dataWithBytes:&uuidBytes length:sizeof(uuidBytes)] base64Encoding];
 #endif
-                                  
+    
     return parameters;
 }
 
@@ -307,20 +345,20 @@ static NSDictionary *OAuthKeychainDictionaryForService(NSString *service) {
                            parameters:(NSDictionary *)parameters
                                 error:(NSError *__autoreleasing *)error {
     NSMutableURLRequest *request = [super requestWithMethod:@"GET" URLString:URLString parameters:parameters error:error];
-
+    
     [request setHTTPMethod:method];
-
+    
     NSString *secret = @"";
-
+    
     if (self.accessToken) {
         secret = self.accessToken.secret;
     } else if (self.requestToken) {
         secret = self.requestToken.secret;
     }
-
+    
     NSString *secretString = [[self.consumerSecret bdb_URLEncode] stringByAppendingFormat:@"&%@", [secret bdb_URLEncode]];
     NSData *secretData = [secretString dataUsingEncoding:NSUTF8StringEncoding];
-
+    
     /**
      * Create signature from request data
      *
@@ -332,19 +370,19 @@ static NSDictionary *OAuthKeychainDictionaryForService(NSString *service) {
      */
     NSString *requestMethod = [[request HTTPMethod] uppercaseString];
     NSString *requestURL    = [[[[request URL] absoluteString] componentsSeparatedByString:@"?"][0] bdb_URLEncode];
-
+    
     NSArray *sortedQueryString = [[[[request URL] query] componentsSeparatedByString:@"&"] sortedArrayUsingSelector:@selector(compare:)];
     NSString *queryString   = [[sortedQueryString componentsJoinedByString:@"&"] bdb_URLEncode];
-
+    
     NSString *requestString = [NSString stringWithFormat:@"%@&%@&%@", requestMethod, requestURL, queryString];
     NSData *requestData = [requestString dataUsingEncoding:NSUTF8StringEncoding];
-
+    
     uint8_t digest[CC_SHA1_DIGEST_LENGTH];
     CCHmacContext context;
     CCHmacInit(&context, kCCHmacAlgSHA1, [secretData bytes], [secretData length]);
     CCHmacUpdate(&context, [requestData bytes], [requestData length]);
     CCHmacFinal(&context, digest);
-
+    
 #if (defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 70000) || (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
     return [[NSData dataWithBytes:digest length:CC_SHA1_DIGEST_LENGTH] base64EncodedStringWithOptions:0];
 #else
@@ -358,51 +396,51 @@ static NSDictionary *OAuthKeychainDictionaryForService(NSString *service) {
                                           error:(NSError *__autoreleasing *)error {
     NSParameterAssert(method);
     NSParameterAssert(URLString);
-
+    
     NSMutableDictionary *mutableParameters;
-
+    
     if (parameters) {
         mutableParameters = [parameters mutableCopy];
     } else {
         mutableParameters = [NSMutableDictionary dictionary];
     }
-
+    
     NSMutableDictionary *mutableAuthorizationParameters = [NSMutableDictionary dictionary];
-
+    
     if (self.consumerKey && self.consumerSecret) {
         [mutableAuthorizationParameters addEntriesFromDictionary:[self OAuthParameters]];
-
+        
         NSString *token = self.accessToken.token;
         
         if (token) {
             mutableAuthorizationParameters[BDBOAuth1OAuthTokenParameter] = token;
         }
     }
-
+    
     [mutableParameters enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
         if ([key isKindOfClass:[NSString class]] && [key hasPrefix:@"oauth_"]) {
             mutableAuthorizationParameters[key] = obj;
         }
     }];
-
+    
     [mutableParameters addEntriesFromDictionary:mutableAuthorizationParameters];
     mutableAuthorizationParameters[BDBOAuth1OAuthSignatureParameter] = [self OAuthSignatureForMethod:method
                                                                                            URLString:URLString
                                                                                           parameters:mutableParameters
                                                                                                error:error];
-
+    
     NSArray *sortedComponents = [[[mutableAuthorizationParameters bdb_queryStringRepresentation] componentsSeparatedByString:@"&"] sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
-
+    
     NSMutableArray *mutableComponents = [NSMutableArray array];
-
+    
     for (NSString *component in sortedComponents) {
         NSArray *subcomponents = [component componentsSeparatedByString:@"="];
-
+        
         if ([subcomponents count] == 2) {
             [mutableComponents addObject:[NSString stringWithFormat:@"%@=\"%@\"", subcomponents[0], subcomponents[1]]];
         }
     }
-
+    
     return [NSString stringWithFormat:@"OAuth %@", [mutableComponents componentsJoinedByString:@", "]];
 }
 
@@ -412,34 +450,34 @@ static NSDictionary *OAuthKeychainDictionaryForService(NSString *service) {
                                 parameters:(NSDictionary *)parameters
                                      error:(NSError *__autoreleasing *)error {
     NSMutableDictionary *mutableParameters = [parameters mutableCopy];
-
+    
     for (NSString *key in parameters) {
         if ([key hasPrefix:@"oauth_"]) {
             [mutableParameters removeObjectForKey:key];
         }
     }
-
+    
     NSMutableURLRequest *request = [super requestWithMethod:method
                                                   URLString:URLString
                                                  parameters:mutableParameters
                                                       error:error];
-
+    
     // Only use parameters in the request entity body (with a content-type of `application/x-www-form-urlencoded`).
     // See RFC 5849, Section 3.4.1.3.1 http://tools.ietf.org/html/rfc5849#section-3.4
     NSDictionary *authorizationParameters = parameters;
-
+    
     if (![self.HTTPMethodsEncodingParametersInURI containsObject:method.uppercaseString]) {
         if (![[request valueForHTTPHeaderField:@"Content-Type"] hasPrefix:@"application/x-www-form-urlencoded"]) {
             authorizationParameters = nil;
         }
     }
-
+    
     [request setValue:[self OAuthAuthorizationHeaderForMethod:method
                                                     URLString:URLString
                                                    parameters:authorizationParameters
                                                         error:error] forHTTPHeaderField:@"Authorization"];
     [request setHTTPShouldHandleCookies:NO];
-
+    
     return request;
 }
 
@@ -449,35 +487,35 @@ static NSDictionary *OAuthKeychainDictionaryForService(NSString *service) {
                               constructingBodyWithBlock:(void (^)(id<AFMultipartFormData>))block
                                                   error:(NSError *__autoreleasing *)error {
     NSMutableDictionary *mutableParameters = [parameters mutableCopy];
-
+    
     for (NSString *key in parameters) {
         if ([key hasPrefix:@"oauth_"]) {
             [mutableParameters removeObjectForKey:key];
         }
     }
-
+    
     NSMutableURLRequest *request = [super multipartFormRequestWithMethod:method
                                                                URLString:URLString
                                                               parameters:mutableParameters
                                                constructingBodyWithBlock:block
                                                                    error:error];
-
+    
     // Only use parameters in the request entity body (with a content-type of `application/x-www-form-urlencoded`).
     // See RFC 5849, Section 3.4.1.3.1 http://tools.ietf.org/html/rfc5849#section-3.4
     NSDictionary *authorizationParameters = parameters;
-
+    
     if (!([self.HTTPMethodsEncodingParametersInURI containsObject:method.uppercaseString])) {
         if (![[request valueForHTTPHeaderField:@"Content-Type"] hasPrefix:@"application/x-www-form-urlencoded"]) {
             authorizationParameters = nil;
         }
     }
-
+    
     [request setValue:[self OAuthAuthorizationHeaderForMethod:method
                                                     URLString:URLString
                                                    parameters:authorizationParameters
                                                         error:error] forHTTPHeaderField:@"Authorization"];
     [request setHTTPShouldHandleCookies:NO];
-
+    
     return request;
 }
 
