@@ -173,6 +173,7 @@ NSString * const BDBOAuth1SignatureNonceParameter       = @"oauth_nonce";
 @property (nonatomic, copy) NSString *service;
 @property (nonatomic, copy) NSString *consumerKey;
 @property (nonatomic, copy) NSString *consumerSecret;
+@property (nonatomic, copy) NSString *shareDefaultGroupId;
 
 - (NSString *)OAuthSignatureForMethod:(NSString *)method
                             URLString:(NSString *)URLString
@@ -210,7 +211,7 @@ NSString * const BDBOAuth1SignatureNonceParameter       = @"oauth_nonce";
         _service = service;
         _consumerKey = consumerKey;
         _consumerSecret = consumerSecret;
-        
+        _shareDefaultGroupId = shareDefaultGroupId;
         _accessToken = [self readAccessTokenFromKeychain:shareDefaultGroupId];
     }
     
@@ -235,31 +236,10 @@ static NSDictionary *OAuthKeychainDictionaryForService(NSString *service) {
     NSData *encodedObject = [sharedDefaults objectForKey:@"accessToken"];
     
     BDBOAuth1Credential *cred = [NSKeyedUnarchiver unarchiveObjectWithData:encodedObject];
-    
+    if (!cred.token.length) {
+        cred = nil;
+    }
     return cred;
-    
-    /*NSMutableDictionary *dictionary = [OAuthKeychainDictionaryForService(self.service) mutableCopy];
-     dictionary[(__bridge id)kSecReturnData] = (__bridge id)kCFBooleanTrue;
-     dictionary[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
-     
-     CFDataRef result = nil;
-     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)dictionary, (CFTypeRef *)&result);
-     NSData *data = (__bridge_transfer NSData *)result;
-     
-     if (status == noErr && data) {
-     @try {
-     NSKeyedUnarchiver *unarchiver = [[NSKeyedUnarchiver alloc] initForReadingWithData:data];
-     [unarchiver setClass:[BDBOAuth1Credential class] forClassName:@"BDBOAuthToken"];
-     
-     return [unarchiver decodeObjectForKey:NSKeyedArchiveRootObjectKey];
-     }
-     @catch (NSException *exception) {
-     return nil;
-     }
-     }
-     
-     return nil;
-     */
 }
 
 - (BOOL)saveAccessToken:(BDBOAuth1Credential *)accessToken withShareDefaultGroupId:(NSString*) shareDefaultGroupId {
@@ -269,6 +249,7 @@ static NSDictionary *OAuthKeychainDictionaryForService(NSString *service) {
         sharedDefaults = [NSUserDefaults standardUserDefaults];
     } else {
         sharedDefaults = [[NSUserDefaults alloc] initWithSuiteName:shareDefaultGroupId];
+        _shareDefaultGroupId = shareDefaultGroupId;
     }
     
     NSData *encodedObject = [NSKeyedArchiver archivedDataWithRootObject:accessToken];
@@ -279,37 +260,17 @@ static NSDictionary *OAuthKeychainDictionaryForService(NSString *service) {
     
     _accessToken = accessToken;
     return YES;
-    
-    
-    /*
-     NSMutableDictionary *dictionary = [OAuthKeychainDictionaryForService(self.service) mutableCopy];
-     
-     NSMutableDictionary *updateDictionary = [NSMutableDictionary dictionary];
-     NSData *data = [NSKeyedArchiver archivedDataWithRootObject:accessToken];
-     updateDictionary[(__bridge id)kSecValueData] = data;
-     
-     OSStatus status;
-     
-     if (self.accessToken) {
-     status = SecItemUpdate((__bridge CFDictionaryRef)dictionary, (__bridge CFDictionaryRef)updateDictionary);
-     } else {
-     [dictionary addEntriesFromDictionary:updateDictionary];
-     status = SecItemAdd((__bridge CFDictionaryRef)dictionary, NULL);
-     }
-     
-     _accessToken = accessToken;
-     
-     if (status == noErr) {
-     return YES;
-     }
-     
-     return NO;
-     */
 }
 
 - (BOOL)removeAccessToken {
     OSStatus status = SecItemDelete((__bridge CFDictionaryRef)OAuthKeychainDictionaryForService(self.service));
     
+    NSUserDefaults *sharedDefaults = nil;
+    if (_shareDefaultGroupId != nil) {
+        sharedDefaults = [[NSUserDefaults alloc] initWithSuiteName:_shareDefaultGroupId];
+        [sharedDefaults setValue:nil forKey:@"accessToken"];
+        [sharedDefaults synchronize];
+    }
     _accessToken = nil;
     
     if (status == noErr) {
